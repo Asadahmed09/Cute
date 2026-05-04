@@ -1,0 +1,679 @@
+#EDA
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+ #load data
+df = pd.read_csv("house_prices_practice.csv")
+
+#show data
+print(df['SalePrice'].describe())
+
+#visualize data
+plt.figure(figsize=(10,10))
+sns.histplot(df['SalePrice'], bins=50 , kde=True , color = 'blue')
+plt.xlabel('Sale Price')
+plt.ylabel('Frequency')
+plt.show()
+
+#extract numeric value
+df_num = df.select_dtypes(['int64','float64'])
+print("Numeric values")
+print(df_num.describe())
+df_num.hist(figsize=(10,10),bins=50 , xlabelsize=10, ylabelsize=10)
+plt.suptitle('Histogram of numeric values')
+plt.show()
+
+#corelation of other cols with sale price
+df_num_corr = df_num.corr()['SalePrice'][:-1]
+golden_feature = df_num_corr[abs(df_num_corr) > 0.5].sort_values(ascending=False)
+
+print("golden feature")
+print(golden_feature)
+
+
+#heatmap
+plt.figure(figsize=(10,10))
+sns.heatmap(df_num.corr() , annot=False, cmap='Blues')
+plt.suptitle('Correlation Matrix')
+plt.show()
+
+#end here
+
+#CSP FINAL
+
+from ortools.sat.python import cp_model
+model = cp_model.CpModel()
+nurses = ['N0','N1','N2','N3','N4','N5'];
+wards = {
+    0 : 'ER',
+    1 : 'ICU',
+    2 : 'PEDIATRICS',
+    3 : 'SURGERY',
+    4 : 'MATERNITY',
+    5 : 'TRIAGE'
+}
+# uniqueness
+assignment = [model.new_int_var(0,len(wards)-1,nurs) for nurs in nurses]
+model.add_all_different(assignment)
+
+# constraints
+model.add(assignment[0] != 1)
+model.add(assignment[0] != 3)
+
+model.add_allowed_assignments([assignment[0]] , [(2,),(4,)])
+
+#conditional dependencies
+n1 = model.new_bool_var('n1')
+model.add(assignment[1] == 0 ).only_enforce_if(n1)
+model.add(assignment[2] == 5 ).only_enforce_if(n1)
+model.add(assignment[1] != 0 ).only_enforce_if(n1.Not())
+
+#conditional dependencies
+n2 = model.new_bool_var('n2')
+model.add(assignment[5] == 3 ).only_enforce_if(n2)
+model.add(assignment[5] != 3 ).only_enforce_if(n2.Not())
+model.add(assignment[3] != 4 ).only_enforce_if(n2)
+
+
+solver = cp_model.CpSolver()
+status = solver.Solve(model)
+
+if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+    print('Optimal solution:')
+    for i in range(5):
+        module_name = wards[solver.value(assignment[i])]
+        print(f"{assignment[i]} -> {module_name}")
+else:
+    print('No optimal solution')
+
+
+#CSP  END 
+
+
+# SIMPLE MIN MAX
+# Keys are the nodes, Values are their children
+game_tree = {
+    'A': ['B', 'C'],
+    'B': ['D', 'E'],
+    'C': ['F', 'G'],
+    'D': [3, 5],
+    'E': [6, 9],
+    'F': [1, 2],
+    'G': [0, -1]
+}
+
+
+# 2. The Minimax Function
+def minimax(node, is_maximizing_player):
+    # BASE CASE: If the node is just a number (a leaf), return the number
+    if isinstance(node, int):
+        return node
+
+    # Get the children of the current node from our dictionary
+    children = game_tree[node]
+
+    # MAXIMIZER'S TURN
+    if is_maximizing_player:
+        best_score = -999  # Start with an impossibly low score
+
+        for child in children:
+            # Time travel down the tree, passing the turn to the Minimizer (False)
+            score = minimax(child, False)
+            best_score = max(best_score, score)
+
+        return best_score
+
+    # MINIMIZER'S TURN
+    else:
+        best_score = 999  # Start with an impossibly high score
+
+        for child in children:
+            # Time travel down the tree, passing the turn to the Maximizer (True)
+            score = minimax(child, True)
+            best_score = min(best_score, score)
+
+        return best_score
+
+
+optimal_value = minimax('A', True)
+
+print(f"Optimal value at root node A: {optimal_value}")
+
+#MIN MAX ENDS HERE
+
+#MIN MAX GRID 
+# The 1D Board limits
+MIN_BOARD = 0
+MAX_BOARD = 4
+GOAL = 4
+
+
+# 1. The Heuristic Function
+def evaluate_board(max_pos, min_pos):
+    if max_pos == GOAL:
+        return 100  # Max won!
+    if max_pos == min_pos:
+        return -100  # Max was caught by Min!
+
+    # HEURISTIC: If the game isn't over, reward Max for being closer to the goal
+    return max_pos * 10
+
+
+# 2. Minimax with Depth Limit
+def minimax(max_pos, min_pos, depth, is_max_turn):
+    # BASE CASE 1: Game Over (Win/Lose)
+    if max_pos == GOAL or max_pos == min_pos:
+        score = evaluate_board(max_pos, min_pos)
+        return score, None
+
+    # BASE CASE 2: Depth Limit Reached (Use Heuristic!)
+    if depth == 0:
+        score = evaluate_board(max_pos, min_pos)
+        print(f"      [Leaf Reached] Max at {max_pos}, Min at {min_pos} -> Heuristic Score: {score}")
+        return score, None
+
+    moves = [1, 0, -1]  # Right, Stay, Left
+
+    if is_max_turn:
+        best_score = -999
+        best_move = 0
+        for move in moves:
+            new_max = max_pos + move
+            if new_max < MIN_BOARD or new_max > MAX_BOARD: continue  # Don't fall off board
+
+            score, _ = minimax(new_max, min_pos, depth - 1, False)
+            if score > best_score:
+                best_score = score
+                best_move = move
+        return best_score, best_move
+
+    else:  # Min's Turn
+        best_score = 999
+        best_move = 0
+        for move in moves:
+            new_min = min_pos + move
+            if new_min < MIN_BOARD or new_min > MAX_BOARD: continue
+
+            score, _ = minimax(max_pos, new_min, depth - 1, True)
+            if score < best_score:
+                best_score = score
+                best_move = move
+        return best_score, best_move
+
+
+# 3. Simulate 3 Game States (Max -> Min -> Max)
+current_max = 0
+current_min = 3
+SEARCH_DEPTH = 3
+
+print("--- STARTING SIMULATION ---")
+print(f"Initial State: Max at {current_max}, Min at {current_min}, Goal at {GOAL}\n")
+
+for turn in range(3):
+    is_max = (turn % 2 == 0)
+    player_name = "Max" if is_max else "Min"
+
+    print(f"--- Turn {turn + 1}: {player_name}'s Turn ---")
+
+    # Ask the AI for the best move
+    best_score, chosen_move = minimax(current_max, current_min, SEARCH_DEPTH, is_max)
+
+    # Apply the move to the real board
+    if is_max:
+        current_max += chosen_move
+    else:
+        current_min += chosen_move
+
+    print(f"> {player_name} chooses to move: {chosen_move}")
+    print(f"> Current Board: Max is at {current_max}, Min is at {current_min}\n")
+
+    # Stop simulation if game naturally ends
+    if current_max == GOAL or current_max == current_min:
+        print("Game Over!")
+        break
+#MIN MAX GRID END
+
+
+#ALPHA BETA
+
+from MinMax import optimal_value
+
+game_tree = {
+    'A': ['B', 'C'],
+    'B': ['D', 'E'],
+    'C': ['F', 'G'],
+    'D': [3, 5],
+    'E': [6, 9],
+    'F': [1, 2],
+    'G': [0, -1]
+}
+def alphaBeta(node , alpha , beta , is_maximizing):
+    if isinstance(node, int):
+        return node
+
+    children = game_tree[node]
+    if is_maximizing:
+        best_score = -999
+        for child in children:
+            score = alphaBeta(child, alpha, beta, False)
+            best_score = max(best_score , score)
+            #updating alphas guaranteed
+            alpha = max(alpha, best_score)
+            #prunning scissors
+            if alpha >= beta:
+                print(f"Prunning at Node {node}! Alpha ({alpha}) >= Beta ({beta})")
+                break #this instantly stops checking
+        print(f"Node {node} has the best score {best_score}")
+        return best_score
+    else:
+        best_score = 999
+        for child in children:
+            score = alphaBeta(child, alpha, beta, True)
+            best_score = min(best_score , score)
+            beta = min(beta , best_score)
+            if alpha >= beta:
+                print(f"Prunning Node {node}! Alpha ({alpha}) >= Beta ({beta})")
+                break
+        print(f"Node {node} has the best score {best_score}")
+        return best_score
+optimal_value = alphaBeta('A',-999,999,True)
+print(f'Optimal : {optimal_value}')
+#APLHA BETA END
+
+
+#tic tac toe | GRID | min max + alpha beta
+import math
+
+# Constants
+X_PLAYER = 'X'  # AI (Max)
+O_PLAYER = 'O'  # Human (Min)
+EMPTY = ' '
+
+
+class TicTacToeAI:
+    def __init__(self):
+        self.board = [EMPTY] * 9  # 3x3 board represented as a 1D list (indices 0-8)
+        self.pruned_count = 0
+        self.max_depth_explored = 0
+
+    def print_board(self):
+        for i in range(3):
+            row = f" {self.board[i * 3]} | {self.board[i * 3 + 1]} | {self.board[i * 3 + 2]} "
+            print(row)
+            if i < 2:
+                print("---|---|---")
+        print()
+
+    def get_empty_cells(self):
+        return [i for i, cell in enumerate(self.board) if cell == EMPTY]
+
+    def is_winner(self, player):
+        # All possible winning lines
+        win_states = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
+            [0, 4, 8], [2, 4, 6]  # Diagonals
+        ]
+        for state in win_states:
+            if self.board[state[0]] == self.board[state[1]] == self.board[state[2]] == player:
+                return True
+        return False
+
+    def is_draw(self):
+        return EMPTY not in self.board
+
+    def evaluate(self, depth):
+        # AI wants to win as FAST as possible, and lose as SLOWLY as possible.
+        # We factor in the 'depth' to penalize longer paths.
+        if self.is_winner(X_PLAYER):
+            return 10 - depth
+        elif self.is_winner(O_PLAYER):
+            return -10 + depth
+        else:
+            return 0
+
+    def alpha_beta(self, depth, alpha, beta, is_maximizing):
+        # Track the deepest part of the tree we reach during this search
+        self.max_depth_explored = max(self.max_depth_explored, depth)
+
+        score = self.evaluate(depth)
+
+        # BASE CASE: If someone won, or board is full, return the score
+        if score != 0 or self.is_draw():
+            return score
+
+        # AI's Turn (Max)
+        if is_maximizing:
+            best_score = -math.inf
+            for cell in self.get_empty_cells():
+                self.board[cell] = X_PLAYER  # Make move
+                score = self.alpha_beta(depth + 1, alpha, beta, False)
+                self.board[cell] = EMPTY  # Undo move
+
+                best_score = max(best_score, score)
+                alpha = max(alpha, best_score)
+
+                # THE PRUNING SCISSORS
+                if alpha >= beta:
+                    self.pruned_count += 1
+                    break
+            return best_score
+
+        # Human's Turn (Min)
+        else:
+            best_score = math.inf
+            for cell in self.get_empty_cells():
+                self.board[cell] = O_PLAYER  # Make move
+                score = self.alpha_beta(depth + 1, alpha, beta, True)
+                self.board[cell] = EMPTY  # Undo move
+
+                best_score = min(best_score, score)
+                beta = min(beta, best_score)
+
+                # THE PRUNING SCISSORS
+                if alpha >= beta:
+                    self.pruned_count += 1
+                    break
+            return best_score
+
+    def find_best_move(self):
+        # Reset tracking stats for the new turn
+        self.pruned_count = 0
+        self.max_depth_explored = 0
+
+        best_score = -math.inf
+        best_move = -1
+        alpha = -math.inf
+        beta = math.inf
+
+        for cell in self.get_empty_cells():
+            self.board[cell] = X_PLAYER
+            score = self.alpha_beta(0, alpha, beta, False)
+            self.board[cell] = EMPTY
+
+            if score > best_score:
+                best_score = score
+                best_move = cell
+
+            # Root level alpha update
+            alpha = max(alpha, best_score)
+
+        return best_move
+
+    def play(self):
+        print("--- Alpha-Beta Tic-Tac-Toe! ---")
+        print("You are 'O'. Positions are 0-8, reading left-to-right, top-to-bottom.\n")
+        self.print_board()
+
+        while not self.is_winner(X_PLAYER) and not self.is_winner(O_PLAYER) and not self.is_draw():
+
+            # --- AI TURN (Max) ---
+            print("AI is thinking...")
+            best_move = self.find_best_move()
+            self.board[best_move] = X_PLAYER
+
+            print(f"> AI (X) played position {best_move}")
+            print(f"  [Stat] Max Depth Explored: {self.max_depth_explored}")
+            print(f"  [Stat] Branches Pruned: {self.pruned_count}\n")
+            self.print_board()
+
+            if self.is_winner(X_PLAYER) or self.is_draw():
+                break
+
+            # --- HUMAN TURN (Min) ---
+            valid_move = False
+            while not valid_move:
+                try:
+                    move = int(input("Your turn (O). Enter position (0-8): "))
+                    if move >= 0 and move <= 8 and self.board[move] == EMPTY:
+                        self.board[move] = O_PLAYER
+                        valid_move = True
+                    else:
+                        print("Invalid or taken position! Try again.")
+                except ValueError:
+                    print("Please enter a valid number (0-8).")
+            print()
+            self.print_board()
+
+        # Game Over Logic
+        if self.is_winner(X_PLAYER):
+            print("AI Wins! (Mathematically guaranteed 😉)")
+        elif self.is_winner(O_PLAYER):
+            print("Human Wins! (Wait, my code is broken if you see this!)")
+        else:
+            print("It's a Draw! Perfectly played on both sides.")
+
+
+# Start the game
+if __name__ == "__main__":
+    game = TicTacToeAI()
+    game.play()
+
+
+#tic tac end
+
+#supervised learning
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error , mean_absolute_error , r2_score , root_mean_squared_error
+
+data = {
+    'study_hours': [5, np.nan, 8, 2, 6, 7, np.nan, 3, 9, 4],
+    'attendance_pct': [85, 90, np.nan, 60, 88, 92, 75, 65, 95, 80],
+    'previous_grades': [78, 85, 90, 55, 82, 88, 70, 60, 92, 75],
+    'participation': ['Medium', 'High', 'High', 'Low', 'Medium', 'High', 'Medium', 'Low', 'High', 'Medium'],
+    'internet_usage': [3, 4, 2, 5, 3, 2, 4, 5, 2, 3], # Hours of non-academic internet use
+    'final_score': [80, 88, 92, 58, 84, 90, 72, 62, 95, 78] # The Target Variable
+}
+df = pd.DataFrame(data)
+#fill missing study hours with average (median) study time
+median_study = df['study_hours'].median()
+df['study_hours'] = df['study_hours'].fillna(median_study)
+
+# encode categorical variables (words to numbers)
+#changing low -> 1 , meidium -> 2 , high -> 3
+participation_map = {'Low':1 , 'Medium':2, 'High':3}
+df['participation'] = df['participation'].map(participation_map)
+
+print("Data is clean and ready!")# 'X' is the student's habits. 'y' is the final score.
+X = df.drop('final_score', axis=1)
+y = df['final_score']
+
+# Split into Training Data (to teach the AI) and Testing Data (to quiz the AI later)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Create the AI Model (Random Forest is great for beginners) and train it!
+model = RandomForestRegressor(random_state=42)
+model.fit(X_train, y_train)
+
+print("Model is trained!")
+# Extract feature importance from the model
+importances = model.feature_importances_
+
+print("\n--- What matters most for grades? ---")
+for feature, importance in zip(X.columns, importances):
+    print(f"{feature}: {importance * 100:.1f}%")
+# Ask the model to guess the scores of the test students
+predictions = model.predict(X_test)
+
+# Calculate how wrong it was
+mae = mean_absolute_error(y_test, predictions)
+rmse = np.sqrt(mean_squared_error(y_test,predictions))
+r2 = r2_score(y_test, predictions)
+
+print("\n--- Model Report Card ---")
+print(f"MAE (Average points off): {mae:.2f}")
+print(f"RMSE (Penalty for big mistakes): {rmse:.2f}")
+print(f"R2 Score (Accuracy out of 1.0): {r2:.2f}")
+
+# New Student: Studies 6 hours, 85% attendance, 80 previous grade, Medium (2) participation, 3 hours internet
+new_student = pd.DataFrame({
+    'study_hours': [6],
+    'attendance_pct': [85],
+    'previous_grades': [80],
+    'participation': [2], # Remember, 2 means 'Medium'
+    'internet_usage': [3]
+})
+
+# Make the prediction
+predicted_score = model.predict(new_student)
+
+print("\n--- New Prediction ---")
+print(f"This student is predicted to score: {predicted_score[0]:.2f}")
+
+#SUPER VISED END here
+#DECESSION TREE CLASSIFIER
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+# --- Step 0: Mock Dataset ---
+data = {
+    'income': [50000, 80000, None, 30000, 120000, 45000, 90000, 35000],
+    'employment_status': ['Employed', 'Employed', 'Self-Employed', 'Unemployed', 'Employed', 'Employed', 'Self-Employed', 'Unemployed'],
+    'credit_score': [650, 720, 680, 520, 800, 610, 750, 580],
+    'loan_amount': [10000, 20000, 15000, 5000, 50000, 12000, 25000, 8000],
+    'marital_status': ['Single', 'Married', 'Married', 'Single', 'Married', 'Single', 'Single', 'Married'],
+    'approved': [1, 1, 1, 0, 1, 0, 1, 0]  # 1 = Approved, 0 = Rejected
+}
+df = pd.DataFrame(data)
+
+# --- Step 1: Preprocess (Missing Values & Encoding) ---
+# Fill missing income with median
+df['income'] = df['income'].fillna(df['income'].median())
+
+# Encode text to numbers using simple mapping
+df['employment_status'] = df['employment_status'].map({'Unemployed': 0, 'Employed': 1, 'Self-Employed': 2})
+df['marital_status'] = df['marital_status'].map({'Single': 0, 'Married': 1})
+
+# --- Step 2: Split Data ---
+X = df.drop('approved', axis=1)
+y = df['approved']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+# --- Step 3: Train Model & Feature Selection ---
+model = DecisionTreeClassifier(random_state=42)
+model.fit(X_train, y_train)
+
+print("--- Key Factors Influencing Loan Approval ---")
+for feature, importance in zip(X.columns, model.feature_importances_):
+    print(f"{feature}: {importance * 100:.1f}%")
+
+# --- Step 4: Evaluate Model ---
+predictions = model.predict(X_test)
+
+print("\n--- Model Evaluation ---")
+print(f"Accuracy (Overall correctness): {accuracy_score(y_test, predictions):.2f}")
+print(f"Precision (When it says yes, is it really yes?): {precision_score(y_test, predictions):.2f}")
+print(f"Recall (Did it find all the actual yeses?): {recall_score(y_test, predictions):.2f}")
+print(f"F1-Score (Balance of Precision and Recall): {f1_score(y_test, predictions):.2f}")
+
+# --- Step 5: Predict New Applicant ---
+new_applicant = pd.DataFrame({
+    'income': [60000],
+    'employment_status': [1], # 1 = Employed
+    'credit_score': [700],
+    'loan_amount': [15000],
+    'marital_status': [0]     # 0 = Single
+})
+
+result = model.predict(new_applicant)
+print(f"\nNew Applicant Prediction: {'Approved (1)' if result[0] == 1 else 'Rejected (0)'}")
+
+#CLASSIFIER END HERE
+
+
+#KMEANS
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+
+# --- Step 0: Create the Mock Dataset ---
+# Includes missing values (None) and sensor errors (e.g., 200000 steps, 26 hours of sleep)
+data = {
+    'user_id': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    'step_count': [10000, 2000, 12000, None, 1500, 11000, 200000, 3000, 14000, 2500], # 200,000 is a sensor error
+    'workout_duration': [45, 10, 60, 20, None, 50, 40, 15, 75, 5],
+    'calories_burned': [400, 150, 500, 200, 100, 450, 350, 120, 600, 80],
+    'heart_rate': [110, 70, 120, 85, 65, 115, 100, 75, 125, 300], # 300 is a sensor error
+    'sleep_hours': [7, 6, 8, 5, 7, 8, 26, 5, 9, 6] # 26 is a sensor error
+}
+df = pd.DataFrame(data)
+
+print("--- Original Raw Data ---")
+print(df.head(), "\n")
+
+# --- Step 1: Data Cleaning & Preprocessing ---
+# 1a. Handle Sensor Errors (Outliers)
+# Cap unrealistic values using domain knowledge
+df.loc[df['step_count'] > 50000, 'step_count'] = 50000
+df.loc[df['heart_rate'] > 200, 'heart_rate'] = 200
+df.loc[df['sleep_hours'] > 24, 'sleep_hours'] = 12
+
+# 1b. Handle Missing Values
+# We fill missing steps and workout duration with the median to avoid skewing data
+df['step_count'] = df['step_count'].fillna(df['step_count'].median())
+df['workout_duration'] = df['workout_duration'].fillna(df['workout_duration'].median())
+
+print("--- Cleaned Data ---")
+print(df.head(), "\n")
+
+# --- Step 2: Exploratory Data Analysis (EDA) ---
+print("--- Statistical Summary ---")
+print(df.drop('user_id', axis=1).describe(), "\n")
+
+# (Optional Visuals - uncomment to view graphs)
+# plt.figure(figsize=(8, 6))
+# sns.histplot(df['step_count'], bins=5, kde=True)
+# plt.title('Distribution of Daily Step Counts')
+# plt.show()
+
+# sns.pairplot(df.drop('user_id', axis=1))
+# plt.suptitle('Relationships Between Fitness Variables', y=1.02)
+# plt.show()
+
+# --- Step 3: Feature Scaling ---
+# K-Means measures "distance" between users. If steps are in the 10,000s and sleep is in the 10s,
+# steps will dominate the algorithm. We MUST scale the data so everything is weighted equally.
+features = ['step_count', 'workout_duration', 'calories_burned', 'heart_rate', 'sleep_hours']
+X = df[features]
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# --- Step 4: Apply K-Means Clustering ---
+# Let's group our users into 2 distinct categories (e.g., Active vs. Inactive)
+kmeans = KMeans(n_clusters=2, random_state=42, n_init=10)
+df['cluster'] = kmeans.fit_predict(X_scaled)
+
+# --- Step 5: Visualize Clusters ---
+# We will plot Steps vs Calories Burned to see the groups visually
+plt.figure(figsize=(8, 6))
+sns.scatterplot(data=df, x='step_count', y='calories_burned', hue='cluster', palette='Set1', s=100)
+plt.title('User Clusters: Step Count vs Calories Burned')
+plt.xlabel('Daily Step Count')
+plt.ylabel('Calories Burned')
+plt.grid(True)
+# plt.show() # Uncomment to render the plot
+
+# --- Step 6: Output Cluster Centers & Interpretation ---
+# We must 'inverse_transform' the centers to turn them back into normal readable numbers
+centers_scaled = kmeans.cluster_centers_
+centers_original = scaler.inverse_transform(centers_scaled)
+
+centers_df = pd.DataFrame(centers_original, columns=features)
+centers_df.index = [f'Cluster {i}' for i in range(2)]
+
+print("--- Cluster Centers (Average traits of each group) ---")
+print(centers_df.round(1))
+
+#END 
