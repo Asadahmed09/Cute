@@ -1,0 +1,564 @@
+=============================================================
+  Q1 SOLUTION — Constraint Satisfaction Problem (CSP)
+  AI Conference Scheduling with Backtracking
+=============================================================
+PROBLEM: Schedule 5 presentations (T1-T5) into 5 time slots
+         while satisfying all logical and professional constraints.
+
+PRESENTATIONS:
+  T1 = Machine Learning
+  T2 = Robotics
+  T3 = Natural Language Processing (NLP)
+  T4 = Computer Vision
+  T5 = Reinforcement Learning
+
+TIME SLOTS:
+  Slot 1: 9:00  - 10:00 AM
+  Slot 2: 10:00 - 11:00 AM
+  Slot 3: 11:00 - 12:00 PM
+  Slot 4: 2:00  - 3:00  PM
+  Slot 5: 3:00  - 4:00  PM
+=============================================================
+"""
+
+# ─────────────────────────────────────────────────────────────
+# PART (a) — VARIABLES
+# Each variable represents a presentation that needs a slot
+# ─────────────────────────────────────────────────────────────
+
+presentations = {
+    'T1': 'Machine Learning',
+    'T2': 'Robotics',
+    'T3': 'Natural Language Processing',
+    'T4': 'Computer Vision',
+    'T5': 'Reinforcement Learning'
+}
+
+# Variable names — these are what the CSP will assign values to
+variables = list(presentations.keys())  # ['T1', 'T2', 'T3', 'T4', 'T5']
+
+slot_times = {
+    1: '9:00 - 10:00 AM',
+    2: '10:00 - 11:00 AM',
+    3: '11:00 - 12:00 PM',
+    4: '2:00 - 3:00 PM',
+    5: '3:00 - 4:00 PM'
+}
+
+print("=" * 60)
+print("       Q1: CONSTRAINT SATISFACTION PROBLEM (CSP)")
+print("=" * 60)
+
+# ─────────────────────────────────────────────────────────────
+# PART (b) — DOMAINS
+# Each variable can initially be assigned any slot (1 to 5)
+# Domains shrink as constraints are applied
+# ─────────────────────────────────────────────────────────────
+
+# Initial domains — before applying any constraint
+initial_domains = {
+    'T1': [1, 2, 3, 4, 5],
+    'T2': [1, 2, 3, 4, 5],
+    'T3': [1, 2, 3, 4, 5],
+    'T4': [1, 2, 3, 4, 5],
+    'T5': [1, 2, 3, 4, 5]
+}
+
+# Reduced domains after applying individual constraints:
+# T5 cannot be Slot 1 or 2 (Constraint 3: no morning slots)
+# T4 cannot be Slot 5       (Constraint 6: not final slot)
+# Slot 3 must go to T1 or T2 (Constraint 7)
+reduced_domains = {
+    'T1': [1, 2, 3, 4, 5],
+    'T2': [1, 2, 3, 4, 5],
+    'T3': [1, 2, 3, 4, 5],
+    'T4': [1, 2, 3, 4],  # cannot be Slot 5
+    'T5': [3, 4, 5]  # cannot be Slot 1 or 2
+}
+
+print("\n📌 PART (a) — VARIABLES")
+print("-" * 40)
+for v in variables:
+    print(f"  Variable {v} = {presentations[v]}")
+
+print("\n📌 PART (b) — DOMAINS")
+print("-" * 40)
+print("  Initial domains (before constraints):")
+for var, dom in initial_domains.items():
+    print(f"  Domain({var}) = Slots {dom}")
+print("\n  Reduced domains (after applying unary constraints):")
+for var, dom in reduced_domains.items():
+    print(f"  Domain({var}) = Slots {dom}")
+
+# ─────────────────────────────────────────────────────────────
+# PART (c) — CONSTRAINTS
+# Rules that every valid assignment must satisfy
+# ─────────────────────────────────────────────────────────────
+
+print("\n📌 PART (c) — CONSTRAINTS")
+print("-" * 40)
+
+constraints_explained = [
+    ("C1 - AllDifferent", "All 5 presentations must be in different slots"),
+    ("C2 - Not Consecutive", "T1 and T3 must NOT be in back-to-back slots: |slot(T1) - slot(T3)| ≠ 1"),
+    ("C3 - T2 before T4", "Robotics must come before Computer Vision: slot(T2) < slot(T4)"),
+    ("C4 - T5 not morning", "Reinforcement Learning cannot be in Slot 1 or 2: slot(T5) ∉ {1, 2}"),
+    ("C5 - T3 after T1", "NLP must come after Machine Learning: slot(T3) > slot(T1)"),
+    ("C6 - T4 not last", "Computer Vision cannot be in Slot 5: slot(T4) ≠ 5"),
+    ("C7 - Slot 3 reserved", "Slot 3 must be assigned to T1 or T2: slot(T1)=3 OR slot(T2)=3"),
+]
+
+for name, desc in constraints_explained:
+    print(f"  {name}:")
+    print(f"    → {desc}")
+
+# ─────────────────────────────────────────────────────────────
+# PART (d) — CONSTRAINT GRAPH
+# Shows which presentation pairs share a constraint
+# ─────────────────────────────────────────────────────────────
+
+print("\n📌 PART (d) — CONSTRAINT GRAPH")
+print("-" * 40)
+
+# Each pair of presentations that has a constraint between them
+constraint_graph = {
+    ('T1', 'T2'): 'AllDiff',
+    ('T1', 'T3'): 'AllDiff + Not Consecutive + T3 after T1',
+    ('T1', 'T4'): 'AllDiff',
+    ('T1', 'T5'): 'AllDiff',
+    ('T2', 'T3'): 'AllDiff',
+    ('T2', 'T4'): 'AllDiff + T2 before T4',
+    ('T2', 'T5'): 'AllDiff',
+    ('T3', 'T4'): 'AllDiff',
+    ('T3', 'T5'): 'AllDiff',
+    ('T4', 'T5'): 'AllDiff',
+}
+
+print("  Edges in the constraint graph:")
+for (a, b), ctype in constraint_graph.items():
+    print(f"  {a} ── {b} : [{ctype}]")
+
+# Visual ASCII constraint graph
+print("""
+  ASCII Constraint Graph:
+  ┌─────────────────────────────────────┐
+  │         T1 ──────────── T3          │
+  │        /|  \\           /           │
+  │       / |   \\         /            │
+  │      T2 |    T4 ─── T5             │
+  │      |  |    |                      │
+  │      └──┴────┘  (AllDiff connects   │
+  │                   all pairs)         │
+  │  Special edges:                      │
+  │  T1─T3: not consecutive + T3>T1     │
+  │  T2─T4: T2 must come before T4      │
+  └─────────────────────────────────────┘
+""")
+
+# ─────────────────────────────────────────────────────────────
+# PART (e) — SOLVE USING BACKTRACKING
+# Try assignments one by one; undo (backtrack) on failure
+# ─────────────────────────────────────────────────────────────
+
+print("\n📌 PART (e) — BACKTRACKING SOLVER")
+print("-" * 40)
+
+
+def is_consistent(assignment, var, value):
+    """
+    Check if assigning 'value' (a slot number) to 'var' (a presentation)
+    is consistent with all constraints given current partial assignment.
+
+    Parameters:
+      assignment : dict  — already assigned variables {var: slot}
+      var        : str   — the variable we want to assign
+      value      : int   — the slot we want to try
+
+    Returns:
+      True if no constraint is violated, False otherwise
+    """
+
+    # C1 — AllDifferent: no two presentations can share the same slot
+    for assigned_var, assigned_val in assignment.items():
+        if assigned_val == value:
+            return False  # slot already taken
+
+    # C4 — T5 cannot be in Slot 1 or 2
+    if var == 'T5' and value in [1, 2]:
+        return False
+
+    # C6 — T4 cannot be in Slot 5
+    if var == 'T4' and value == 5:
+        return False
+
+    # C7 — Slot 3 must be T1 or T2
+    if value == 3 and var not in ['T1', 'T2']:
+        return False
+
+    # C2 — T1 and T3 must NOT be in consecutive slots
+    if var == 'T3' and 'T1' in assignment:
+        if abs(assignment['T1'] - value) == 1:
+            return False
+    if var == 'T1' and 'T3' in assignment:
+        if abs(value - assignment['T3']) == 1:
+            return False
+
+    # C3 — T2 must come before T4 (slot(T2) < slot(T4))
+    if var == 'T4' and 'T2' in assignment:
+        if assignment['T2'] >= value:
+            return False
+    if var == 'T2' and 'T4' in assignment:
+        if value >= assignment['T4']:
+            return False
+
+    # C5 — T3 must come after T1 (slot(T3) > slot(T1))
+    if var == 'T3' and 'T1' in assignment:
+        if value <= assignment['T1']:
+            return False
+    if var == 'T1' and 'T3' in assignment:
+        if value >= assignment['T3']:
+            return False
+
+    return True  # all checks passed — this assignment is valid so far
+
+
+def backtrack(assignment, domains, step=1):
+    """
+    Recursive backtracking search.
+
+    How it works:
+    1. If all variables are assigned → return the solution
+    2. Pick an unassigned variable
+    3. Try each value in its domain
+    4. If the value is consistent → assign it and recurse
+    5. If recursion fails → undo the assignment (backtrack) and try next value
+    6. If no value works → return None (failure, go back further)
+
+    Parameters:
+      assignment : dict — current partial assignment {var: slot}
+      domains    : dict — possible slots for each variable
+      step       : int  — step counter for logging
+
+    Returns:
+      Complete valid assignment dict, or None if no solution found
+    """
+
+    # BASE CASE: all 5 variables assigned → we found a solution!
+    if len(assignment) == len(variables):
+        return assignment
+
+    # Choose next unassigned variable (in order: T1, T2, T3, T4, T5)
+    unassigned = [v for v in variables if v not in assignment]
+    var = unassigned[0]
+
+    print(f"\n  Step {step}: Trying to assign slot to {var} ({presentations[var]})")
+
+    # Try each possible slot value for this variable
+    for value in domains[var]:
+        print(f"    → Trying Slot {value} for {var} ... ", end="")
+
+        if is_consistent(assignment, var, value):
+            print("✅ Consistent! Assigning.")
+            assignment[var] = value  # assign the value
+
+            # Recurse: try to assign the rest
+            result = backtrack(assignment, domains, step + 1)
+
+            if result is not None:
+                return result  # solution found downstream!
+
+            # If we get here, the assignment failed somewhere down the line
+            print(f"    ↩️ Backtracking: Slot {value} for {var} led to failure. Trying next.")
+            del assignment[var]  # undo the assignment (backtrack)
+
+        else:
+            print("❌ Violates a constraint. Skipping.")
+
+    return None  # no valid value found for this variable
+
+
+# Run the solver
+print("  Starting backtracking search...\n")
+solution = backtrack({}, reduced_domains)
+
+print("\n" + "=" * 60)
+print("  ✅ FINAL SOLUTION FOUND!")
+print("=" * 60)
+
+if solution:
+    # Sort by slot number for clean display
+    sorted_solution = sorted(solution.items(), key=lambda x: x[1])
+
+    print(f"\n{'Slot':<8} {'Time':<22} {'Code':<5} {'Presentation'}")
+    print("-" * 58)
+    for var, slot in sorted_solution:
+        print(f"Slot {slot:<4} {slot_times[slot]:<22} {var:<5} {presentations[var]}")
+
+    print("\n  Constraint Verification:")
+    print("-" * 40)
+    s = solution  # shorthand
+
+    checks = [
+        ("C1 AllDifferent", len(set(s.values())) == 5,
+         f"Slots used: {sorted(s.values())}"),
+        ("C2 T1/T3 not consecutive", abs(s['T1'] - s['T3']) != 1,
+         f"|slot(T1)={s['T1']} - slot(T3)={s['T3']}| = {abs(s['T1'] - s['T3'])}"),
+        ("C3 T2 before T4", s['T2'] < s['T4'],
+         f"slot(T2)={s['T2']} < slot(T4)={s['T4']}"),
+        ("C4 T5 not morning", s['T5'] not in [1, 2],
+         f"slot(T5)={s['T5']}"),
+        ("C5 T3 after T1", s['T3'] > s['T1'],
+         f"slot(T3)={s['T3']} > slot(T1)={s['T1']}"),
+        ("C6 T4 not Slot 5", s['T4'] != 5,
+         f"slot(T4)={s['T4']}"),
+        ("C7 Slot3=T1 or T2", s.get('T1') == 3 or s.get('T2') == 3,
+         f"T1→Slot{s['T1']}, T2→Slot{s['T2']}"),
+    ]
+
+    all_passed = True
+    for name, passed, detail in checks:
+        icon = "✅" if passed else "❌"
+        print(f"  {icon} {name}: {detail}")
+        if not passed:
+            all_passed = False
+
+    print()
+    if all_passed:
+        print("  🎉 ALL CONSTRAINTS SATISFIED — Schedule is valid!")
+    else:
+        print("  ⚠️  Some constraints failed — check logic.")
+else:
+    print("  ❌ No solution found.")
+
+
+#==============================================================================
+
+"""
+=============================================================
+  Q2 SOLUTION — Minimax Algorithm & Alpha-Beta Pruning
+  Strategic Card Game: AI (MAX) vs Opponent (MIN)
+=============================================================
+PROBLEM: An AI plays a card game against an opponent.
+  - AI     = MAX player (wants HIGHEST score)
+  - Opponent = MIN player (wants LOWEST score for AI)
+
+STRATEGY CARDS (AI's choices) and opponent responses:
+  Card A: opponent responds with 7 or 3
+  Card B: opponent responds with 6 or 5
+  Card C: opponent responds with 9 or 1
+  Card D: opponent responds with 5 or 11
+
+TASKS:
+  (a) Explain how strategy cards model Minimax without a tree
+  (b) For each card, find the opponent's (MIN) optimal move
+  (c) Find which card AI (MAX) should choose
+  (d) Find the final guaranteed payoff (utility value)
+  (e) Explain Minimax assumption & one real-world limitation
+=============================================================
+"""
+
+print("=" * 65)
+print("       Q2: MINIMAX ALGORITHM — STRATEGY CARD GAME")
+print("=" * 65)
+
+# ─────────────────────────────────────────────────────────────
+# GAME DATA
+# Each card has two possible opponent responses (leaf values)
+# ─────────────────────────────────────────────────────────────
+
+# Structure: { card_name: [response_1_score, response_2_score] }
+game_tree = {
+    'Card A': [7, 3],
+    'Card B': [6, 5],
+    'Card C': [9, 1],
+    'Card D': [5, 11]
+}
+
+# ─────────────────────────────────────────────────────────────
+# PART (a) — How strategy cards model Minimax WITHOUT a tree
+# ─────────────────────────────────────────────────────────────
+
+print("""
+📌 PART (a) — How "Strategy Cards" model a Minimax problem
+            without using a traditional tree structure
+──────────────────────────────────────────────────────────────
+In a traditional Minimax game tree you draw nodes and branches.
+The strategy card format replaces the tree as follows:
+
+  TREE CONCEPT          →  CARD FORMAT EQUIVALENT
+  ─────────────────────────────────────────────────
+  MAX node (AI choice)  →  Each Card (A, B, C, D)
+  MIN node (opponent)   →  The 2 responses under each card
+  Leaf node (score)     →  The actual numbers (7, 3, 6, etc.)
+  Level 1 (depth=1)     →  AI picks a card
+  Level 2 (depth=2)     →  Opponent picks their best response
+
+Equivalent tree structure:
+                     [AI - MAX]
+          ┌──────┬──────┬──────┐
+        Card A  Card B  Card C  Card D
+        [MIN]   [MIN]   [MIN]   [MIN]
+        /  \\    /  \\    /  \\    /  \\
+       7    3  6    5  9    1  5   11
+
+The table IS the tree — just written compactly.
+Each card = one MAX branch; each response pair = two MIN branches.
+The opponent always picks the response that MINIMIZES AI's score.
+""")
+
+# ─────────────────────────────────────────────────────────────
+# PART (b) — MIN player's optimal choice for each card
+# The opponent (MIN) always picks the LOWER of the two values
+# ─────────────────────────────────────────────────────────────
+
+print("📌 PART (b) — Opponent (MIN player) optimal move per card")
+print("─" * 62)
+print(f"  {'Card':<10} {'Response 1':<14} {'Response 2':<14} {'MIN picks':<12} {'Reason'}")
+print("  " + "-" * 60)
+
+minimax_values = {}  # will store the minimax value for each card
+
+for card, responses in game_tree.items():
+    r1, r2 = responses
+    min_choice = min(r1, r2)  # MIN player always picks the smaller value
+    picked_response = 1 if r1 < r2 else (2 if r2 < r1 else "either")
+    reason = f"min({r1}, {r2}) = {min_choice}"
+    minimax_values[card] = min_choice
+    print(f"  {card:<10} {r1:<14} {r2:<14} {min_choice:<12} {reason}")
+
+print("""
+  Why MIN picks the lower value:
+  The opponent wants to MINIMIZE the AI's score.
+  So given two possible outcomes, the opponent always
+  chooses the one that results in the lowest score for AI.
+""")
+
+# ─────────────────────────────────────────────────────────────
+# PART (c) — MAX player's best card choice
+# AI (MAX) looks at the minimax values and picks the HIGHEST
+# ─────────────────────────────────────────────────────────────
+
+print("📌 PART (c) — AI (MAX player) optimal card selection")
+print("─" * 62)
+print("\n  Minimax values after opponent plays optimally:")
+for card, val in minimax_values.items():
+    print(f"    {card}: guaranteed score = {val}")
+
+best_value = max(minimax_values.values())  # MAX picks the highest guaranteed score
+best_cards = [c for c, v in minimax_values.items() if v == best_value]
+
+print(f"\n  MAX picks: max({list(minimax_values.values())}) = {best_value}")
+print(f"\n  ✅ AI should choose: {' or '.join(best_cards)}")
+print(f"     (Both guarantee a score of {best_value})")
+
+print("""
+  Why not Card C (which could give 9)?
+  Card C could give 9 if opponent responds poorly,
+  BUT a perfect opponent will ALWAYS pick 1 (the minimum).
+  Minimax assumes the opponent is perfect — so Card C
+  is guaranteed to give only 1, making it the WORST choice.
+
+  Card B is preferred (first encountered with max value).
+""")
+
+# ─────────────────────────────────────────────────────────────
+# PART (d) — Final guaranteed payoff (utility value)
+# ─────────────────────────────────────────────────────────────
+
+print("📌 PART (d) — Final Guaranteed Payoff (Utility Value)")
+print("─" * 62)
+
+print(f"""
+  The guaranteed payoff = minimax value of the chosen card
+
+  If AI plays {best_cards[0]} → Opponent's best response gives: {best_value}
+
+  ✅ Final Guaranteed Payoff (Utility Value) = {best_value}
+
+  This means: No matter what the opponent does,
+  if AI plays {best_cards[0]}, AI is GUARANTEED to score at least {best_value}.
+  The opponent cannot reduce the score below {best_value}.
+  If the opponent makes a mistake, AI may score HIGHER than {best_value}.
+""")
+
+# ─────────────────────────────────────────────────────────────
+# PART (e) — Minimax assumption & real-world limitation
+# ─────────────────────────────────────────────────────────────
+
+print("📌 PART (e) — Minimax Assumption & Real-World Limitation")
+print("─" * 62)
+
+print("""
+  WHY MINIMAX ASSUMES A PERFECT OPPONENT:
+  ─────────────────────────────────────────
+  Minimax is a WORST-CASE strategy. By assuming the opponent
+  always plays perfectly (i.e., always minimizes AI's score),
+  the AI designs a strategy that is SAFE even in the hardest case.
+
+  If the opponent is perfect → AI gets exactly the minimax value.
+  If the opponent makes mistakes → AI gets MORE than the minimax value.
+
+  So the minimax value is a guaranteed LOWER BOUND on the AI's score.
+  This is why the assumption makes the strategy robust and reliable.
+
+  ONE REAL-WORLD LIMITATION:
+  ─────────────────────────────────────────
+  Real opponents are NOT always perfect. Humans:
+    • Make emotional or impulsive decisions
+    • Miss the optimal move (especially under time pressure)
+    • Play randomly or unpredictably
+
+  Problem this creates:
+    → Minimax may be overly CONSERVATIVE.
+    → In this game, Card C could give 9 if opponent picks badly,
+      but Minimax always avoids Card C because it assumes they pick 1.
+    → This means AI MISSES opportunities for higher payoffs
+      by being too defensive.
+
+  Real-world fix: Use probabilistic models (like Expectimax) that
+  assign probabilities to opponent moves instead of assuming perfection.
+""")
+
+# ─────────────────────────────────────────────────────────────
+# BONUS: Full Minimax Algorithm (generic implementation)
+# ─────────────────────────────────────────────────────────────
+
+print("📌 BONUS — Full Minimax Function (Generic Implementation)")
+print("─" * 62)
+
+
+def minimax(node, depth, is_maximizing, tree):
+    """
+    Generic Minimax algorithm — works on any game tree.
+
+    Parameters:
+      node          : str  — current node name (e.g., 'Card A')
+      depth         : int  — current depth in the tree
+      is_maximizing : bool — True if current player is MAX, False if MIN
+      tree          : dict — the game tree {node: [children values or sub-nodes]}
+
+    Returns:
+      int — the minimax value of this node
+    """
+
+    # BASE CASE: if this node is a leaf (has numeric values, not sub-nodes)
+    if isinstance(tree[node][0], int):
+        leaf_values = tree[node]
+
+        if is_maximizing:
+            # MAX player picks the maximum leaf value
+            return max(leaf_values)
+        else:
+            # MIN player picks the minimum leaf value
+            return min(leaf_values)
+
+    # RECURSIVE CASE: evaluate children
+    if is_maximizing:
+        best = float('-inf')  # start with worst possible for MAX
+        for child in tree[node]:
+            val = minimax(child, depth + 1, False, tree)  # opponent's turn next
+            best = max(best, val)
+        return best
+    else:
+        best = float('inf')  # start with worst possible for MIN
+        for child in tree[node]:
